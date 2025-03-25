@@ -15,7 +15,7 @@ const ItemCard = ({ item }) => {
           {item.location} . {item.timeAgo}
         </div>
         <div className='text-white text-lg font-bold mt-1'>
-          {item.price.toLocalString()}원
+          {item.price.toLocaleString()}원
         </div>
         <div className='text-gray-400 text-sm mt-1'>
           댓글 {item.comments} . 관심 {item.likes}

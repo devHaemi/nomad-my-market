@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 export default function NavigationBar() {
   return (
-    <nav className='fixed bottom-0 left-0 w-full bg-[#2D2D2D] text-white'>
+    <nav className='fixed bottom-0 left-0 w-full bg-zinc-900 text-white'>
       <div className='flex justify-around items-center h-[60px]'>
         <Link href='/' className='flex flex-col items-center'>
           <HomeIcon />

@@ -7,17 +7,12 @@ import ItemList from '@/components/ItemList'
 import NavigationBar from '@/components/NavigationBar'
 import AddItemButton from '@/components/AddItemButton'
 import AddItemModal from '@/components/AddItemModal'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  const client = new QueryClient({
-    defaultOptions: {},
-  })
-
   return (
-    <QueryClientProvider client={client}>
+    <div>
       <Header />
       <ItemList />
       <AddItemButton onClick={() => setIsModalOpen(true)} />
@@ -26,6 +21,6 @@ export default function Home() {
         onClose={() => setIsModalOpen(false)}
       />
       <NavigationBar />
-    </QueryClientProvider>
+    </div>
   )
 }

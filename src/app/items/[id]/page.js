@@ -18,12 +18,58 @@ async function fetchItem(id) {
   return data
 }
 
+// 좋아요 상태 확인 함수
+async function checkLikeStatus(itemId, userId) {
+  try {
+    console.log('checkLikeStatus', itemId, userId)
+    const { data, error } = await supabase
+      .from('likes')
+      .select('*')
+      .eq('item_id', itemId)
+      .eq('user_id', userId)
+
+    // PGRST116은 결과가 없는 경우이므로 false 반환
+    if (error && error.code === 'PGRST116') {
+      return false
+    }
+
+    // 다른 에러가 있는 경우 throw
+    if (error) throw error
+
+    if (data.length > 0) {
+      return true
+    } else {
+      return false
+    }
+  } catch (error) {
+    console.error('좋아요 상태 확인 중 에러:', error)
+    return false
+  }
+}
+
 export default function ItemDetail({ params }) {
   const resolvedParams = use(params)
   const router = useRouter()
   const queryClient = useQueryClient()
   const [userId, setUserId] = useState(null)
   const [isLiked, setIsLiked] = useState(false)
+
+  // 현재 로그인한 사용자 정보 가져오기
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        setUserId(user.id)
+        // 좋아요 상태 확인
+        const liked = await checkLikeStatus(resolvedParams.id, user.id)
+        setIsLiked(liked)
+      }
+    }
+    fetchUser()
+  }, [resolvedParams.id])
 
   const {
     data: item,
@@ -32,6 +78,43 @@ export default function ItemDetail({ params }) {
   } = useQuery({
     queryKey: ['item', resolvedParams.id],
     queryFn: () => fetchItem(resolvedParams.id),
+  })
+
+  const toggleLikeMutation = useMutation({
+    mutationFn: async () => {
+      if (!userId) throw new Error('로그인이 필요합니다.')
+
+      if (isLiked) {
+        // 좋아요 취소
+        await supabase
+          .from('likes')
+          .delete()
+          .eq('item_id', resolvedParams.id)
+          .eq('user_id', userId)
+
+        await supabase
+          .from('items')
+          .update({ likes: item.likes - 1 })
+          .eq('id', resolvedParams.id)
+      } else {
+        // 좋아요 추가
+        await supabase
+          .from('likes')
+          .insert([{ item_id: resolvedParams.id, user_id: userId }])
+
+        await supabase
+          .from('likes')
+          .update({ likes: item.likes + 1 })
+          .eq('id', resolvedParams.id)
+      }
+    },
+    onSuccess: () => {
+      setIsLiked(!isLiked)
+      queryClient.invalidateQueries(['item', resolvedParams.id])
+    },
+    onError: () => {
+      alert(error.message)
+    },
   })
 
   if (isLoading) {

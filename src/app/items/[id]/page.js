@@ -14,7 +14,6 @@ async function fetchItem(id) {
     .single()
 
   if (error) throw error
-
   return data
 }
 
@@ -47,6 +46,29 @@ async function checkLikeStatus(itemId, userId) {
   }
 }
 
+async function incrementViews(id) {
+  try {
+    // 현재 아이템의 조회수를 가져옴
+    const { data: currentItem, error: fetchError } = await supabase
+      .from('items')
+      .select('views')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // 조회수 증가
+    const { error: updateError } = await supabase
+      .from('items')
+      .update({ views: (currentItem.views || 0) + 1 })
+      .eq('id', id)
+
+    if (updateError) throw updateError
+  } catch (error) {
+    console.error('조회수 증가 중 에러:', error)
+  }
+}
+
 export default function ItemDetail({ params }) {
   const resolvedParams = use(params)
   const router = useRouter()
@@ -69,7 +91,16 @@ export default function ItemDetail({ params }) {
       }
     }
     fetchUser()
-  }, [resolvedParams.id])
+
+    // 조회수 증가
+    const updateViewCount = async () => {
+      await incrementViews(resolvedParams.id)
+      // 쿼리 무효화하여 데이터 새로고침
+      queryClient.invalidateQueries(['item', resolvedParams.id])
+    }
+
+    updateViewCount()
+  }, [resolvedParams.id, queryClient])
 
   const {
     data: item,
@@ -80,6 +111,7 @@ export default function ItemDetail({ params }) {
     queryFn: () => fetchItem(resolvedParams.id),
   })
 
+  // 좋아요 토글 뮤테이션
   const toggleLikeMutation = useMutation({
     mutationFn: async () => {
       if (!userId) throw new Error('로그인이 필요합니다.')
@@ -103,7 +135,7 @@ export default function ItemDetail({ params }) {
           .insert([{ item_id: resolvedParams.id, user_id: userId }])
 
         await supabase
-          .from('likes')
+          .from('items')
           .update({ likes: item.likes + 1 })
           .eq('id', resolvedParams.id)
       }
@@ -112,7 +144,7 @@ export default function ItemDetail({ params }) {
       setIsLiked(!isLiked)
       queryClient.invalidateQueries(['item', resolvedParams.id])
     },
-    onError: () => {
+    onError: (error) => {
       alert(error.message)
     },
   })

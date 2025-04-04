@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { ArrowLeft, Heart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { use, useEffect, useState } from 'react'
+import Comments from '@/components/Comments'
 
 async function fetchItem(id) {
   const { data, error } = await supabase
@@ -20,7 +21,6 @@ async function fetchItem(id) {
 // 좋아요 상태 확인 함수
 async function checkLikeStatus(itemId, userId) {
   try {
-    console.log('checkLikeStatus', itemId, userId)
     const { data, error } = await supabase
       .from('likes')
       .select('*')
@@ -82,7 +82,6 @@ export default function ItemDetail({ params }) {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-
       if (user) {
         setUserId(user.id)
         // 좋아요 상태 확인
@@ -92,7 +91,7 @@ export default function ItemDetail({ params }) {
     }
     fetchUser()
 
-    // 조회수 증가
+    // 조회수 증가 후 쿼리 무효화
     const updateViewCount = async () => {
       await incrementViews(resolvedParams.id)
       // 쿼리 무효화하여 데이터 새로고침
@@ -101,6 +100,52 @@ export default function ItemDetail({ params }) {
 
     updateViewCount()
   }, [resolvedParams.id, queryClient])
+
+  const handleStartChat = async () => {
+    if (!userId) {
+      alert('로그인이 필요합니다.')
+      return
+    }
+
+    try {
+      // 이미 존재하는 채팅방 확인
+      const { data: existingRoom, error: findError } = await supabase
+        .from('chat_rooms')
+        .select('id')
+        .eq('item_id', resolvedParams.id)
+        .eq('buyer_id', userId)
+        .single()
+
+      if (findError && findError.code !== 'PGRST116') {
+        throw findError
+      }
+
+      if (existingRoom) {
+        router.push(`/chat/${existingRoom.id}`)
+        return
+      }
+
+      // 새 채팅방 생성
+      const { data: newRoom, error: createError } = await supabase
+        .from('chat_rooms')
+        .insert([
+          {
+            item_id: resolvedParams.id,
+            seller_id: item.user_id,
+            buyer_id: userId,
+          },
+        ])
+        .select()
+        .single()
+
+      if (createError) throw createError
+
+      router.push(`/chat/${newRoom.id}`)
+    } catch (error) {
+      console.error('채팅방 생성 중 오류:', error)
+      alert('채팅방을 생성할 수 없습니다.')
+    }
+  }
 
   const {
     data: item,
@@ -199,6 +244,12 @@ export default function ItemDetail({ params }) {
         <div className='text-gray-400'>
           조회 {item.views || 0} · 관심 {item.likes} · 댓글 {item.comments}
         </div>
+      </div>
+
+      {/* 댓글 섹션 */}
+      <div className='p-4 pb-20'>
+        <h2 className='text-xl font-bold mb-4'>댓글</h2>
+        <Comments itemId={resolvedParams.id} />
       </div>
 
       {/* 하단 고정 버튼 */}
